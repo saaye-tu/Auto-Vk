@@ -3761,6 +3761,33 @@ namespace avk
 		);
 	}
 
+	framebuffer root::create_framebuffer_from_template(const framebuffer_t& aTemplate, std::function<void(image_t&)> aAlterImageConfigBeforeCreation,
+		std::function<void(image_view_t&)> aAlterImageViewConfigBeforeCreation, std::function<void(framebuffer_t&)> aAlterFramebufferConfigBeforeCreation)
+	{
+		bool recreateRenderPass = false; // TODO evaluate conditions under which render pass requires recreation (possibly compare image infos before and after config modification) [?]
+		if (!aTemplate.get_renderpass().is_shared_ownership_enabled())
+		{
+			throw avk::runtime_error("Renderpass of the framebuffer which requires updating does not have shared ownership enabled");
+		}
+
+		const auto& templateImageViews = aTemplate.image_views();
+		std::vector<avk::image_view> imageViews;
+
+		for (auto& imView : templateImageViews)
+		{
+			auto imageView = create_image_view_from_template(imView, aAlterImageConfigBeforeCreation, aAlterImageViewConfigBeforeCreation);
+			imageViews.emplace_back(std::move(imageView));
+		}
+
+		std::optional<renderpass> newRenderPass;
+		if (recreateRenderPass)
+		{			
+			newRenderPass = create_renderpass_from_template(aTemplate.get_renderpass());
+		}
+
+		return create_framebuffer(newRenderPass.has_value() ? newRenderPass.value() : renderpass{ aTemplate.get_renderpass() }, std::move(imageViews), aAlterFramebufferConfigBeforeCreation);
+	}
+
 	std::optional<command_buffer> framebuffer_t::initialize_attachments(sync aSync)
 	{
 		aSync.establish_barrier_before_the_operation(pipeline_stage::transfer, {}); // TODO: Don't use transfer after barrier-stage-refactoring
@@ -4540,6 +4567,12 @@ namespace avk
 		if (aAlterConfigBeforeCreation) {
 			aAlterConfigBeforeCreation(result);
 		}
+		
+		// image resolution has possibly changed now - recalculate mipmap levels if necessary
+		auto mipLevels = avk::has_flag(result.mImageUsage, avk::image_usage::mip_mapped)
+			? static_cast<uint32_t>(1 + std::floor(std::log2(std::max(result.mInfo.extent.width, result.mInfo.extent.height))))
+			: 1u;
+		result.mInfo.setMipLevels(mipLevels);
 
 		// Create the image...
 		result.mImage = device().createImageUnique(result.mInfo);
@@ -4658,7 +4691,6 @@ namespace avk
 	{
 		return create_image(aWidth, aHeight, std::make_tuple(aFormat, vk::SampleCountFlagBits::e1), aNumLayers, aMemoryUsage, aImageUsage, std::move(aAlterConfigBeforeCreation));
 	}
-
 
 	image root::create_depth_image(uint32_t aWidth, uint32_t aHeight, std::optional<vk::Format> aFormat, int aNumLayers,  memory_usage aMemoryUsage, avk::image_usage aImageUsage, std::function<void(image_t&)> aAlterConfigBeforeCreation)
 	{
@@ -4855,7 +4887,7 @@ namespace avk
 		if (std::holds_alternative<image>(aTemplate.mImage)) {
 			auto& im = std::get<image>(aTemplate.mImage);
 			result.mImage = create_image_from_template(im, std::move(aAlterImageConfigBeforeCreation));
-			if (im.is_shared_ownership_enabled()) {
+			if (im.is_shared_ownership_enabled()) { //TODO: is this really necessary? 
 				std::get<image>(result.mImage).enable_shared_ownership();
 			}
 		}

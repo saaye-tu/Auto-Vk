@@ -476,7 +476,8 @@ namespace avk
 		framebuffer create_framebuffer(renderpass aRenderpass, std::vector<image_view> aImageViews, uint32_t aWidth, uint32_t aHeight, std::function<void(framebuffer_t&)> aAlterConfigBeforeCreation = {});
 		framebuffer create_framebuffer(std::vector<attachment> aAttachments, std::vector<image_view> aImageViews, uint32_t aWidth, uint32_t aHeight, std::function<void(framebuffer_t&)> aAlterConfigBeforeCreation = {});
 		framebuffer create_framebuffer(renderpass aRenderpass, std::vector<image_view> aImageViews, std::function<void(framebuffer_t&)> aAlterConfigBeforeCreation = {});
-		framebuffer create_framebuffer(std::vector<attachment> aAttachments, std::vector<image_view> aImageViews, std::function<void(framebuffer_t&)> aAlterConfigBeforeCreation = {});
+		framebuffer create_framebuffer(std::vector<attachment> aAttachments, std::vector<image_view> aImageViews, std::function<void(framebuffer_t&)> aAlterConfigBeforeCreation = {});	
+		framebuffer create_framebuffer_from_template(const framebuffer_t& aTemplate, std::function<void(image_t&)> aAlterImageConfigBeforeCreation = {}, std::function<void(image_view_t&)> aAlterImageViewConfigBeforeCreation = {}, std::function<void(framebuffer_t&)> aAlterFramebufferConfigBeforeCreation = {});
 
 		template <typename ...ImViews>
 		framebuffer create_framebuffer(std::vector<avk::attachment> aAttachments, ImViews... aImViews)
